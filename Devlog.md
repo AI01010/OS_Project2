@@ -13,5 +13,8 @@ Added devlog, readme, and teller and customer files
  
 ## 04.09.2025 17:27 CodingSession::END
 
+## 04.09.2025 17:43 CodingSession::BEGIN
 
+continued code. added customer and teller logic
 
+## 04.09.2025 18:18 CodingSession::END

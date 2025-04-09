@@ -14,6 +14,7 @@ Requirements
     The customers will be served by the tellers. 
     The customers will be served in the order they arrive at the bank.
 
+Door entry (max 2 customers)
 
 There are three tellers, and the bank opens when all three are ready. No customers can enter the bank before it is open. Throughout the day, customers
  will visit the bank to either make a withdraw or make a deposit. If there is a free teller, a customer
@@ -40,11 +41,10 @@ There are three tellers, and the bank opens when all three are ready. No custome
  4. Wait until customer gives the transaction
  5. If the transaction is a Withdraw, go to the manager for permission.
  • The manager always gives permission, but will take some time interacting with the teller
- • To represent this interaction, the teller thread should block (sleep) for a random duration
- from 5 to 30 ms.
+ • To represent this interaction, the teller thread should block (sleep) for a random duration from 5 to 30 ms.
  6. Go to the safe, waiting if it is occupied by two tellers
  7. In the safe, the teller will physically perform the transaction
- • represent this by blocking (sleeping) for a random duration of between 10 and 50 ms.
+     • represent this by blocking (sleeping) for a random duration of between 10 and 50 ms.
  8. Go back and inform the customer the transaction is done
  9. Wait for customer to leave teller
  */
@@ -57,7 +57,7 @@ There are three tellers, and the bank opens when all three are ready. No custome
  2. The customer will wait between 0 – 100ms
  3. The customer will enter the bank (The door only allows two customers to enter at a time).
  4. The customer will get in line.
- • If there is a teller ready to serve, the customer should immediately go to a ready teller.
+     • If there is a teller ready to serve, the customer should immediately go to a ready teller.
  • otherwise, the customer should wait until called and then go to a ready teller.
  5. The customer will introduce itself (give its id) to the teller.
  6. The customer will wait for the teller to ask for the transaction.
@@ -86,10 +86,17 @@ There are three tellers, and the bank opens when all three are ready. No custome
 
 
  #include <iostream>
- #include <pthread.h>
- #include <semaphore.h>
- #include <unistd.h>
- 
+ #include <thread>
+ #include <vector>
+ #include <mutex>
+ #include <semaphore>
+ #include <random>
+ #include <chrono>
+
+ #include <unistd.h> // for sleep function
+ #include <cstdlib> // for rand() and srand()
+ #include <ctime> // for time() function
+
  //3 tellers
  //50 customers
 
@@ -114,12 +121,21 @@ There are three tellers, and the bank opens when all three are ready. No custome
                                       10, 11, 12, 13, 14, 15, 16, 17, 18, 19,
                                       20, 21, 22, 23, 24, 25, 26, 27, 28, 29,
                                       30, 31, 32, 33, 34, 35, 36, 37, 38, 39,
-                                      40, 41, 42, 43, 44, 45,46 ,47 ,48 ,49};
+                                      40, 41, 42, 43, 44, 45,46 ,47 ,48 ,49}; 
 
-    // Teller thread function
-    
-    
+// Teller thread function
 
+
+void customerThread(int customerId)
+{
+
+}
+
+
+void tellerThread(int tellerId) 
+{
+
+}
 
 int main()
 {
