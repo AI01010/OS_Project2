@@ -6,3 +6,12 @@ Added devlog, readme, and teller and customer files
 
 ## 03.26.2025 15:05 CodingSession::END
 
+## 04.09.2025 16:09 CodingSession::BEGIN
+
+ merge teller + customer files
+ descriptions added and code skeleton made
+ 
+## 04.09.2025 17:27 CodingSession::END
+
+
+
