@@ -40,5 +40,7 @@ change line queues? to single line for all tellers and both doors?
 
 ## 04.10.2025 13:11 CodingSession::END
 
+NOTE: re-check logic, add back manager seperately?
+
 
 
