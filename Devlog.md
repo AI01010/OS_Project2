@@ -33,5 +33,12 @@ NOTE: for tellers and customers use vectors
 
 continued customer and teller logic
 added manager logic
+added code
+log to both console and logfile?
+added semaphores
+change line queues? to single line for all tellers and both doors?
+
+## 04.10.2025 13:11 CodingSession::END
+
 
 

@@ -1,211 +1,179 @@
-// banker.cpp
- 
 #include <iostream>
 #include <thread>
 #include <vector>
+#include <queue>
 #include <mutex>
-#include <semaphore>
+#include <semaphore.h>
 #include <random>
 #include <chrono>
+#include <fstream>
 
-#include <unistd.h> // for sleep function
-#include <cstdlib> // for rand() and srand()
-#include <ctime> // for time() function
+using namespace std;
 
- //3 tellers
- //50 customers
+// Constants
+const int NUM_TELLERS = 3;
+const int NUM_CUSTOMERS = 5;
 
-    // Bank manager
-    // Semaphore for the bank manager
-    // sem_t managerSemaphore;
-    // // Semaphore for the safe (only two tellers can access it at a time)
-    // sem_t safeSemaphore;
-    // // Semaphore for the door (only two customers can enter at a time)
-    // sem_t doorSemaphore;
-    // // Mutex for critical section (to protect shared resources)
-    // pthread_mutex_t mutex;
+// Shared resources
+sem_t doorSemaphore; // Semaphore for the door (max 2 customers)
+sem_t safeSemaphore; // Semaphore for the safe (max 2 tellers)
+sem_t managerSemaphore; // Semaphore for manager interaction
+pthread_mutex_t mutex; // Mutex for critical sections
 
-    // // Number of tellers
-    // const int NUM_TELLERS = 3;
-    // // Number of customers
-    // const int NUM_CUSTOMERS = 50;
-    // // Teller ID
-    // int tellerID[NUM_TELLERS] = {0, 1, 2};
-    // // Customer ID
-    // int customerID[NUM_CUSTOMERS] = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9,
-    //                                   10, 11, 12, 13, 14, 15, 16, 17, 18, 19,
-    //                                   20, 21, 22, 23, 24, 25, 26, 27, 28, 29,
-    //                                   30, 31, 32, 33, 34, 35, 36, 37, 38, 39,
-    //                                   40, 41, 42, 43, 44, 45,46 ,47 ,48 ,49}; 
+// Queues for teller lines
+queue<int> tellerLines[NUM_TELLERS];
+bool tellerAvailable[NUM_TELLERS] = {true, true, true}; // Track teller availability
 
-// Teller thread function
+// Log file
+ofstream logFile("logfile.txt");
 
-Semaphore bankSemaphore;
-
-/*
-    Manager thread
-*/
-void managerThread(int managerId)
+// Log message formatting function
+void logMessage(string threadType, int threadId, string message)
 {
-    // blocked until recvied [widthdraw request] msg from teller
-    while (condition) //no msg recived from teller
-    {
-        /*  return [accept] msg to teller */
-    }
-    
+    string formattedMessage = threadType + " [" + to_string(threadId) + "]: " + message;
+    cout << formattedMessage << endl;
+    logFile << formattedMessage << endl;
 }
 
-/*
- The Teller
- When a teller thread is created it should be given an unique id to differentiate it from other tellers.
- There are three (3) tellers. The teller will follow the following sequence of actions until there are
- no more customers to serve.
- 1. Teller will let everyone know it is ready to serve
- 2. Wait for a customer to approach
- 3. When signaled by the customer, the teller asks for the transaction
- 4. Wait until customer gives the transaction
- 5. If the transaction is a Withdraw, go to the manager for permission.
- • The manager always gives permission, but will take some time interacting with the teller
- • To represent this interaction, the teller thread should block (sleep) for a random duration from 5 to 30 ms.
- 6. Go to the safe, waiting if it is occupied by two tellers
- 7. In the safe, the teller will physically perform the transaction
-     • represent this by blocking (sleeping) for a random duration of between 10 and 50 ms.
- 8. Go back and inform the customer the transaction is done
- 9. Wait for customer to leave teller
- */
-void tellerThread(int tellerId) 
-{
-    while (condition) //id <= 50 (global customersServed counter?) or (!isDone bool)
-    {
-        //start teller - ready state
-        // wait for customer - blocked until customer send [hello] msg
-
-        if (/* some condition to stop */) break;
-
-        // when customer arrives - repsond [ask] msg to get customer info and transaction type as a [id, deposit/widthdrawl, amt] msg 
-        // customer locked until teller done 
-        if () //widthdraw
-        {
-            //  goto manager, get permission msg [sleep 5-30ms] 
-        }    
-        // goto safe [sleep 10-50ms]
-        // msg customer [transaction completed successfully]
-        // customer unlocks and leaves, teller goes back to ready state (blocked until next customer [hello] msg)
-        
-    }
-
-}
-
-/*
- The Customer
- When the customer thread is created it should be given an unique id to differentiate it from other
- customers. There are 50 customers. The customer will follow the following sequence actions.
- 1. The customer will decide (at random) what transaction to perform: Deposit or Withdrawal.
- 2. The customer will wait between 0 – 100ms
- 3. The customer will enter the bank (The door only allows two customers to enter at a time).
- 4. The customer will get in line.
-     • If there is a teller ready to serve, the customer should immediately go to a ready teller.
- • otherwise, the customer should wait until called and then go to a ready teller.
- 5. The customer will introduce itself (give its id) to the teller.
- 6. The customer will wait for the teller to ask for the transaction.
- 7. The customer will tell the teller the transaction.
- 8. The customer will wait for the teller to complete the transaction.
- 9. The customer will leave the bank through the door (and the simulation)
- */
+// Customer thread function
 void customerThread(int customerId)
 {
-    bool isDeposit_Withdrawal = (rand() % 2 == 0);
-    // wait rand [0-100ms]
-    // enter bank in queue/arr line
-    if (!) //a teller !open (global bool?)
+    // Randomly decide transaction type
+    bool isDeposit = (rand() % 2 == 0);
+    int transactionAmount = rand() % 100 + 1; // Random amount between 1 and 100
+
+    // Wait before entering the bank
+    this_thread::sleep_for(chrono::milliseconds(rand() % 100));
+
+    // Enter the bank (wait for door semaphore)
+    sem_wait(&doorSemaphore);
+    logMessage("Customer", customerId, "enters the bank");
+
+    // Find an available teller or join a line
+    int assignedTeller = -1;
+    pthread_mutex_lock(&mutex);
+    for (int i = 0; i < NUM_TELLERS; i++)
     {
-        // join queue/arr line
+        if (tellerAvailable[i])
+        {
+            tellerAvailable[i] = false;
+            assignedTeller = i;
+            break;
+        }
     }
-    // interact send [hello] msg and wait
-    // when get [ask] msg from teller respond with transaction type [d/w + amt] msg to teller
-    // block until teller is done, sends [transaction completed succesfully] msg
-    // leave bank queue/arr line
+    if (assignedTeller == -1)
+    {
+        // No teller available, join the shortest line
+        int shortestLine = 0;
+        for (int i = 1; i < NUM_TELLERS; i++)
+        {
+            if (tellerLines[i].size() < tellerLines[shortestLine].size())
+            {
+                shortestLine = i;
+            }
+        }
+        tellerLines[shortestLine].push(customerId);
+        logMessage("Customer", customerId, "joins line for Teller " + to_string(shortestLine));
+    }
+    pthread_mutex_unlock(&mutex);
+
+    if (assignedTeller != -1)
+    {
+        // Approve teller
+        logMessage("Customer", customerId, "approves Teller " + to_string(assignedTeller));
+
+        // Provide transaction info
+        string transactionType = isDeposit ? "Deposit" : "Withdrawal";
+        logMessage("Customer", customerId, "provides transaction info: " + transactionType + " of $" + to_string(transactionAmount));
+
+        // Wait for teller to complete the transaction
+        pthread_mutex_lock(&mutex);
+        tellerLines[assignedTeller].push(customerId);
+        pthread_mutex_unlock(&mutex);
+    }
+
+    // Leave the bank
+    logMessage("Customer", customerId, "leaves the bank");
+    sem_post(&doorSemaphore);
+}
+
+// Teller thread function
+void tellerThread(int tellerId)
+{
+    while (true)
+    {
+        pthread_mutex_lock(&mutex);
+        if (!tellerLines[tellerId].empty())
+        {
+            int customerId = tellerLines[tellerId].front();
+            tellerLines[tellerId].pop();
+            tellerAvailable[tellerId] = false;
+            pthread_mutex_unlock(&mutex);
+
+            // Greet the customer
+            logMessage("Teller", tellerId, "greets Customer " + to_string(customerId));
+
+            // Simulate transaction processing
+            logMessage("Teller", tellerId, "begins serving Customer " + to_string(customerId));
+            this_thread::sleep_for(chrono::milliseconds(rand() % 41 + 10)); // Sleep 10-50ms
+
+            // Complete transaction
+            logMessage("Teller", tellerId, "completes transaction for Customer " + to_string(customerId));
+
+            pthread_mutex_lock(&mutex);
+            tellerAvailable[tellerId] = true;
+            pthread_mutex_unlock(&mutex);
+        }
+        else
+        {
+            pthread_mutex_unlock(&mutex);
+            this_thread::sleep_for(chrono::milliseconds(10)); // Avoid busy waiting
+        }
+    }
 }
 
 int main()
 {
-    const int NUM_TELLERS = 3; //3
-    const int NUM_CUSTOMERS = 5; //50
+    srand(time(0)); // Seed for random number generation
 
-
-    // Initialize semaphores and mutexes
-    sem_t tellerSemaphore[3]; // Semaphore for each teller
-    pthread_mutex_t mutex; // Mutex for critical section
-
+    // Initialize semaphores and mutex
+    sem_init(&doorSemaphore, 0, 2); // Max 2 customers in the bank
+    sem_init(&safeSemaphore, 0, 2); // Max 2 tellers in the safe
+    sem_init(&managerSemaphore, 0, 1); // Only 1 teller can interact with the manager
     pthread_mutex_init(&mutex, NULL);
 
+    // Create teller threads
+    vector<thread> tellers;
+    for (int i = 0; i < NUM_TELLERS; i++)
+    {
+        tellers.emplace_back(tellerThread, i);
+    }
 
-    
+    // Create customer threads
+    vector<thread> customers;
+    for (int i = 0; i < NUM_CUSTOMERS; i++)
+    {
+        customers.emplace_back(customerThread, i);
+    }
+
+    // Join customer threads
+    for (auto &customer : customers)
+    {
+        customer.join();
+    }
+
+    // Detach teller threads
+    for (auto &teller : tellers)
+    {
+        teller.detach();
+    }
+
+    // Clean up resources
+    sem_destroy(&doorSemaphore);
+    sem_destroy(&safeSemaphore);
+    sem_destroy(&managerSemaphore);
+    pthread_mutex_destroy(&mutex);
+    logFile.close();
+
     return 0;
 }
-
-
-
-
-
-/*
- The Output
- The teller and customer threads should print out a line for each (simulated) action they are
- performing, and should use the following format.
- THREAD_TYPE ID [THREAD_TYPE ID]: MSG
- The THREAD_TYPE can be either “Customer” or “Teller”. The ID is the threads assigned id. The MSG
- is a short description of the action taken. Here is an example.
- Customer 10 [Teller 0]: selects teller
-
- Every time a thread must block for an amount of time, there should be two lines. One line will
- be document he action taken, and be before the wait, and the other will document the actions
- completion, and be after the wait.
-
- Similarly, accessing the shared resources (manager and safe), there should be three lines.
- One indicating the teller is going to the resource, one indicating the thread is using the resource,
- and another indicating the thread is done using the resource.
- For a more detailed example, see the sample run attached to the assignment on e-learning
- */
-
-
-
-
-// Banker's Algorithm Implementation
-/*
-Requirements
- The Bank
- The bank has three tellers and a manager. The bank is closed until all three tellers are ready to serve.
- The bank has a safe, which can only be accessed by two tellers at a time. The bank also has a manager,
- who must give permission for any teller to make a withdraw. The bank opens when all three tellers are ready.
- The bank has a door, which can only allow two customers to enter at a time. The bank has 50 customers,
-    who will visit the bank to either make a withdraw or make a deposit. The customers will be served by the tellers.
-    The customers will be served in the order they arrive at the bank. 
-    The customers will be served by the tellers. 
-    The customers will be served in the order they arrive at the bank.
-
-Door entry (max 2 customers)
-
-There are three tellers, and the bank opens when all three are ready. 
-No customers can enter the bank before it is open. 
-Throughout the day, customers will visit the bank to either make a withdraw or make a deposit. 
-
-If there is a free teller, a customer entering the bank can go to that teller to be served. 
-Otherwise, the customer must wait in line to be called. 
-
-The customer will tell the teller what transition to make. 
-The teller must then go into the safe, for which only two tellers are allowed in side at any one time. 
-
-Additionally, if the customer wants to make a withdraw the teller must get permission from the bank manager. 
-Only one teller at a time can interact with the manager. 
-Once the transaction is complete the customer leaves the bank, and the teller calls the next in line. 
-
-Once all 50 customers have been served, and have left the bank, the bank closes.  
-
-Identify the shared resources the threads will be using. For example, the safe and the manager
- are fairly obvious ones. These will need to be protected by semaphores. Other semaphores will
- also be needed to synchronize the behavior of the threads. For instance, the customer should not
- leave until the Teller has finished the transaction. You do not need to ensure that your semaphores
- are strong (also called fair). */
-
-
-
