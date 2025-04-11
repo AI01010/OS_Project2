@@ -20,12 +20,14 @@ int tellerAvailable[NUM_TELLERS] = {1, 1, 1}; // Track teller availability
 int customersRemaining = NUM_CUSTOMERS;      // Track remaining customers
 
 // Function to log messages
-void logMessage(const char *threadType, int threadId, const char *message) {
+void logMessage(const char *threadType, int threadId, const char *message) 
+{
     printf("%s [%d]: %s\n", threadType, threadId, message);
 }
 
 // Customer thread function
-void *customerThread(void *arg) {
+void *customerThread(void *arg) 
+{
     int customerId = *(int *)arg;
     free(arg);
 
@@ -43,8 +45,10 @@ void *customerThread(void *arg) {
     // Find an available teller
     int assignedTeller = -1;
     pthread_mutex_lock(&mutex);
-    for (int i = 0; i < NUM_TELLERS; i++) {
-        if (tellerAvailable[i]) {
+    for (int i = 0; i < NUM_TELLERS; i++) 
+    {
+        if (tellerAvailable[i]) 
+        {
             tellerAvailable[i] = 0; // Mark teller as busy
             assignedTeller = i;
             break;
@@ -52,17 +56,21 @@ void *customerThread(void *arg) {
     }
     pthread_mutex_unlock(&mutex);
 
-    if (assignedTeller != -1) {
+    if (assignedTeller != -1) 
+    {
         // Approach and greet the teller
         logMessage("Customer", customerId, "approaches Teller");
         logMessage("Teller", assignedTeller, "greets Customer");
 
         // Teller asks for transaction info
         logMessage("Teller", assignedTeller, "asks for transaction info");
-        if (isDeposit) {
+        if (isDeposit) 
+        {
             logMessage("Customer", customerId, "requests Deposit");
             logMessage("Teller", assignedTeller, "completes Deposit transaction");
-        } else {
+        } 
+        else 
+        {   
             logMessage("Customer", customerId, "requests Withdrawal");
 
             // Teller approaches manager for permission
@@ -102,15 +110,18 @@ void *customerThread(void *arg) {
 }
 
 // Teller thread function
-void *tellerThread(void *arg) {
+void *tellerThread(void *arg) 
+{
     int tellerId = *(int *)arg;
     free(arg);
 
     logMessage("Teller", tellerId, "is ready to serve");
 
-    while (1) {
+    while (1) 
+    {
         pthread_mutex_lock(&mutex);
-        if (customersRemaining <= 0) {
+        if (customersRemaining <= 0) 
+        {
             pthread_mutex_unlock(&mutex);
             break;
         }
@@ -123,7 +134,8 @@ void *tellerThread(void *arg) {
     return NULL;
 }
 
-int main() {
+int main() 
+{
     srand(time(NULL)); // Seed for random number generation
 
     // Initialize semaphores and mutex
@@ -134,7 +146,8 @@ int main() {
 
     // Create teller threads
     pthread_t tellers[NUM_TELLERS];
-    for (int i = 0; i < NUM_TELLERS; i++) {
+    for (int i = 0; i < NUM_TELLERS; i++) 
+    {
         int *tellerId = malloc(sizeof(int));
         *tellerId = i;
         pthread_create(&tellers[i], NULL, tellerThread, tellerId);
@@ -142,19 +155,22 @@ int main() {
 
     // Create customer threads
     pthread_t customers[NUM_CUSTOMERS];
-    for (int i = 0; i < NUM_CUSTOMERS; i++) {
+    for (int i = 0; i < NUM_CUSTOMERS; i++) 
+    {
         int *customerId = malloc(sizeof(int));
         *customerId = i;
         pthread_create(&customers[i], NULL, customerThread, customerId);
     }
 
     // Wait for all customer threads to finish
-    for (int i = 0; i < NUM_CUSTOMERS; i++) {
+    for (int i = 0; i < NUM_CUSTOMERS; i++) 
+    {
         pthread_join(customers[i], NULL);
     }
 
     // Wait for all teller threads to finish
-    for (int i = 0; i < NUM_TELLERS; i++) {
+    for (int i = 0; i < NUM_TELLERS; i++) 
+    {
         pthread_join(tellers[i], NULL);
     }
 
