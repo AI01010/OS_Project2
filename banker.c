@@ -7,17 +7,18 @@
 // Constants
 #define NUM_TELLERS 3
 #define NUM_CUSTOMERS 5
-#define MAX_DOOR_CAPACITY 2
 
 // Shared resources
-sem_t doorSemaphore;       // Semaphore for the door (max 2 customers)
-sem_t safeSemaphore;       // Semaphore for the safe (max 2 tellers)
-sem_t managerSemaphore;    // Semaphore for manager interaction
-pthread_mutex_t mutex;     // Mutex for critical sections
+sem_t bank_open;
+sem_t safe_access;      // Semaphore for the safe (max 2 tellers)
+sem_t manager_access;   // Semaphore for manager interaction (max 1 teller)
+sem_t door_access;     // Semaphore for the door (max 2 customers)
+pthread_mutex_t queue_mutex = PTHREAD_MUTEX_INITIALIZER;
+int customers_served = 0;
 
-// Teller and customer states
-int tellerAvailable[NUM_TELLERS] = {1, 1, 1}; // Track teller availability
-int customersRemaining = NUM_CUSTOMERS;      // Track remaining customers
+// // Teller and customer states
+// int tellerAvailable[NUM_TELLERS] = {1, 1, 1}; // Track teller availability
+// int customersRemaining = NUM_CUSTOMERS;      // Track remaining customers
 
 // Function to log messages
 void logMessage(const char *threadType, int threadId, const char *message) 
@@ -26,112 +27,72 @@ void logMessage(const char *threadType, int threadId, const char *message)
 }
 
 // Customer thread function
-void *customerThread(void *arg) 
+void *customer(void *arg) 
 {
-    int customerId = *(int *)arg;
-    free(arg);
+    int customer_id = *(int *)arg;
+    usleep(rand() % 100000); // wait before entering
 
-    // Randomly decide transaction type
-    int isDeposit = rand() % 2;
-    int transactionAmount = rand() % 100 + 1; // Random amount between 1 and 100
+    sem_wait(&door_access);
+    printf("Customer %d: Entering bank\n", customer_id);
+    logMessage("Customer", customer_id, "has entered the bank");
+    sem_post(&door_access);
 
-    // Wait before entering the bank
-    usleep(rand() % 100000); // Sleep for 0-100ms
-
-    // Enter the bank (wait for door semaphore)
-    sem_wait(&doorSemaphore);
-    logMessage("Customer", customerId, "enters the bank");
-
-    // Find an available teller
-    int assignedTeller = -1;
-    pthread_mutex_lock(&mutex);
-    for (int i = 0; i < NUM_TELLERS; i++) 
-    {
-        if (tellerAvailable[i]) 
-        {
-            tellerAvailable[i] = 0; // Mark teller as busy
-            assignedTeller = i;
-            break;
-        }
-    }
-    pthread_mutex_unlock(&mutex);
-
-    if (assignedTeller != -1) 
-    {
-        // Approach and greet the teller
-        logMessage("Customer", customerId, "approaches Teller");
-        logMessage("Teller", assignedTeller, "greets Customer");
-
-        // Teller asks for transaction info
-        logMessage("Teller", assignedTeller, "asks for transaction info");
-        if (isDeposit) 
-        {
-            logMessage("Customer", customerId, "requests Deposit");
-            logMessage("Teller", assignedTeller, "completes Deposit transaction");
-        } 
-        else 
-        {   
-            logMessage("Customer", customerId, "requests Withdrawal");
-
-            // Teller approaches manager for permission
-            sem_wait(&managerSemaphore);
-            logMessage("Teller", assignedTeller, "asks Manager for permission");
-            usleep(rand() % 100000); // Simulate manager interaction
-            logMessage("Manager", 0, "grants permission");
-            sem_post(&managerSemaphore);
-
-            // Teller accesses the safe
-            sem_wait(&safeSemaphore);
-            logMessage("Teller", assignedTeller, "enters the safe");
-            usleep(rand() % 100000); // Simulate safe access
-            logMessage("Teller", assignedTeller, "exits the safe");
-            sem_post(&safeSemaphore);
-
-            logMessage("Teller", assignedTeller, "completes Withdrawal transaction");
-        }
-
-        // Customer leaves the teller
-        logMessage("Customer", customerId, "leaves Teller");
-        pthread_mutex_lock(&mutex);
-        tellerAvailable[assignedTeller] = 1; // Mark teller as available
-        pthread_mutex_unlock(&mutex);
-    }
-
-    // Exit the bank
-    logMessage("Customer", customerId, "exits the bank");
-    sem_post(&doorSemaphore);
-
-    // Decrement remaining customers
-    pthread_mutex_lock(&mutex);
-    customersRemaining--;
-    pthread_mutex_unlock(&mutex);
-
-    return NULL;
+    pthread_exit(NULL);
 }
 
 // Teller thread function
-void *tellerThread(void *arg) 
+void *teller(void *arg) 
 {
-    int tellerId = *(int *)arg;
-    free(arg);
+    int teller_id = *(int *)arg;
+    printf("Teller %d: Ready to serve!\n", teller_id);
+    logMessage("Teller", teller_id, "is ready to serve customers");
 
-    logMessage("Teller", tellerId, "is ready to serve");
-
+    if (teller_id == NUM_TELLERS - 1) 
+    {
+        sem_post(&bank_open); // Last teller signals that the bank is open
+    }
+    
     while (1) 
     {
-        pthread_mutex_lock(&mutex);
-        if (customersRemaining <= 0) 
+        pthread_mutex_lock(&queue_mutex);
+        if (customers_served >= NUM_CUSTOMERS) 
         {
-            pthread_mutex_unlock(&mutex);
+            pthread_mutex_unlock(&queue_mutex);
             break;
         }
-        pthread_mutex_unlock(&mutex);
+        customers_served++;
+        pthread_mutex_unlock(&queue_mutex);
 
-        usleep(10000); // Simulate waiting for customers
+        printf("Teller %d: Waiting for customer\n", teller_id);
+        logMessage("Teller", teller_id, "is waiting for a customer");
+        usleep(rand() % 1000);
+
+        int transaction = rand() % 2; // 0: Deposit, 1: Withdraw
+        printf("Teller %d: Processing transaction\n", teller_id);
+        logMessage("Teller", teller_id, "is processing a transaction");
+
+        if (transaction == 1) 
+        {
+            sem_wait(&manager_access);
+            printf("Teller %d: Requesting withdrawal permission\n", teller_id);
+            logMessage("Teller", teller_id, "is requesting withdrawal permission from the manager");
+            usleep((rand() % 25 + 5) * 1000);
+            printf("Teller %d: Permission granted\n", teller_id);
+            logMessage("Teller", teller_id, "has received permission from the manager");
+            sem_post(&manager_access);
+        }
+
+        sem_wait(&safe_access);
+        printf("Teller %d: Accessing safe\n", teller_id);
+        logMessage("Teller", teller_id, "is accessing the safe");
+        usleep((rand() % 40 + 10) * 1000);
+        printf("Teller %d: Transaction complete\n", teller_id);
+        logMessage("Teller", teller_id, "has completed the transaction");
+        sem_post(&safe_access);
     }
 
-    logMessage("Teller", tellerId, "is leaving for the day");
-    return NULL;
+    // logMessage("Teller", tellerId, "is leaving for the day");
+    pthread_exit(NULL);
 }
 
 int main() 
@@ -139,27 +100,29 @@ int main()
     srand(time(NULL)); // Seed for random number generation
 
     // Initialize semaphores and mutex
-    sem_init(&doorSemaphore, 0, MAX_DOOR_CAPACITY); // Max 2 customers in the bank
-    sem_init(&safeSemaphore, 0, 2);                // Max 2 tellers in the safe
-    sem_init(&managerSemaphore, 0, 1);             // Only 1 teller can interact with the manager
-    pthread_mutex_init(&mutex, NULL);
+    sem_init(&safe_access, 0, 2);            // Max 2 tellers in the safe
+    sem_init(&manager_access, 0, 1);        // Only 1 teller can interact with the manager
+    sem_init(&door_access, 0, 2);        // Max 2 customers in the door
+    sem_init(&bank_open, 0, 0);           
 
+    pthread_t tellers[NUM_TELLERS], customers[NUM_CUSTOMERS];
+    int teller_ids[NUM_TELLERS], customer_ids[NUM_CUSTOMERS];
+
+    
     // Create teller threads
-    pthread_t tellers[NUM_TELLERS];
     for (int i = 0; i < NUM_TELLERS; i++) 
     {
-        int *tellerId = malloc(sizeof(int));
-        *tellerId = i;
-        pthread_create(&tellers[i], NULL, tellerThread, tellerId);
+        teller_ids[i] = i;
+        pthread_create(&tellers[i], NULL, teller, &teller_ids[i]);
     }
+    
+    sem_wait(&bank_open); // Wait for bank to open
 
     // Create customer threads
-    pthread_t customers[NUM_CUSTOMERS];
     for (int i = 0; i < NUM_CUSTOMERS; i++) 
     {
-        int *customerId = malloc(sizeof(int));
-        *customerId = i;
-        pthread_create(&customers[i], NULL, customerThread, customerId);
+        customer_ids[i] = i;
+        pthread_create(&customers[i], NULL, customer, &customer_ids[i]);
     }
 
     // Wait for all customer threads to finish
@@ -175,11 +138,13 @@ int main()
     }
 
     // Clean up resources
-    sem_destroy(&doorSemaphore);
-    sem_destroy(&safeSemaphore);
-    sem_destroy(&managerSemaphore);
-    pthread_mutex_destroy(&mutex);
-
+    sem_destroy(&door_access);
+    sem_destroy(&safe_access);
+    sem_destroy(&manager_access);
+    sem_destroy(&bank_open);
+    pthread_mutex_destroy(&queue_mutex);
+    
+    printf("Bank has closed.\n");
     logMessage("Bank", 0, "is closed for the day");
     return 0;
 }

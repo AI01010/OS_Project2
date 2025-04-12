@@ -48,6 +48,10 @@ continued coding. converted to c from cpp
 
 ## 04.11.2025 03:46 CodingSession::END
 
+## 04.12.2025 09:31 CodingSession::BEGIN
 
+continued coding. fix logic and make manager shared resource, fix queues
+
+## 04.12.2025 11:57 CodingSession::END
 
 
