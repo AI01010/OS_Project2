@@ -1,3 +1,10 @@
+/*******************************************************************************
+*  CS4348 Operating Systems
+*  Project 2  - Banker Simulation
+*  Ashraful Islam
+*
+*******************************************************************************/
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <pthread.h>
