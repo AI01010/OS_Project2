@@ -54,4 +54,7 @@ continued coding. fix logic and make manager shared resource, fix queues
 
 ## 04.12.2025 11:57 CodingSession::END
 
+NOTE: tested on cslinux1.utdallas.edu servers
+
+
 
