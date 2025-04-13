@@ -69,3 +69,12 @@ updated code, cutomer and teller and main. Add log to file?
 
 ## 04.13.2025 16:58 CodingSession::END
 
+Note: do log file last
+
+## 04.13.2025 17:52 CodingSession::BEGIN
+
+updated log to console, and sync issues 
+update arrays use to store information
+
+## 04.13.2025 18:19 CodingSession::END
+
