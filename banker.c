@@ -10,28 +10,67 @@
 #include <pthread.h>
 #include <semaphore.h>
 #include <unistd.h>
+#include <time.h>
 
 // Constants
 #define NUM_TELLERS 3
 #define NUM_CUSTOMERS 5
+#define MAX_CUSTOMERS_INSIDE 2
+#define MAX_SAFE_OCCUPANCY 2
+
 
 // Shared resources
-sem_t bank_open;
-sem_t safe_access;      // Semaphore for the safe (max 2 tellers)
-sem_t manager_access;   // Semaphore for manager interaction (max 1 teller)
-sem_t door_access;     // Semaphore for the door (max 2 customers)
-pthread_mutex_t queue_mutex = PTHREAD_MUTEX_INITIALIZER;
-int customers_served = 0;
+sem_t door_sem;     // Semaphore for the door (max 2 customers)
+sem_t safe_sem;    // Semaphore for the safe (max 2 tellers)    
+sem_t manager_sem;  // Semaphore for manager interaction (max 1 teller)
+sem_t customers_ready;  // Semaphore for customers ready to be served
+sem_t customer_done[NUM_CUSTOMERS]; // Semaphores for each customer
+
+// sem_t bank_open;
+pthread_mutex_t print_mutex = PTHREAD_MUTEX_INITIALIZER; // Mutex for printing
+pthread_mutex_t line_mutex = PTHREAD_MUTEX_INITIALIZER; // Mutex for line access
+pthread_mutex_t served_mutex = PTHREAD_MUTEX_INITIALIZER; // Mutex for served customers
+// int customers_served = 0;
 
 // // Teller and customer states
 // int tellerAvailable[NUM_TELLERS] = {1, 1, 1}; // Track teller availability
 // int customersRemaining = NUM_CUSTOMERS;      // Track remaining customers
 
-// Function to log messages
-void logMessage(const char *threadType, int threadId, const char *message) 
+int line[NUM_CUSTOMERS];
+int front = 0, rear = 0;
+int customers_served = 0;
+int transaction_type[NUM_CUSTOMERS]; // 0 = deposit, 1 = withdrawal
+
+// functions to log messages
+void log_action(const char *actor_type, int actor_id, const char *related_type, int related_id, const char *msg) 
 {
-    printf("%s [%d]: %s\n", threadType, threadId, message);
+    pthread_mutex_lock(&print_mutex);
+    if (related_type == NULL) 
+    {
+        printf("%s %d []: %s\n", actor_type, actor_id, msg);
+    } 
+    else 
+    {
+        printf("%s %d [%s %d]: %s\n", actor_type, actor_id, related_type, related_id, msg);
+    }
+    pthread_mutex_unlock(&print_mutex);
 }
+
+void log_teller(int tid, const char *msg) 
+{
+    log_action("Teller", tid, NULL, 0, msg);
+}
+
+void log_customer(int cid, const char *msg) 
+{
+    log_action("Customer", cid, NULL, 0, msg);
+}
+
+void log_customer_with_teller(int cid, int tid, const char *msg) 
+{
+    log_action("Customer", cid, "Teller", tid, msg);
+}
+
 
 // Customer thread function
 void *customer(void *arg) 
@@ -50,18 +89,22 @@ void *customer(void *arg)
 // Teller thread function
 void *teller(void *arg) 
 {
-    int teller_id = *(int *)arg;
-    printf("Teller %d: Ready to serve!\n", teller_id);
-    logMessage("Teller", teller_id, "is ready to serve customers");
+    int tid = *((int *)arg);
+    log_teller(tid, "ready to serve");
+    // logMessage("Teller", teller_id, "is ready to serve customers");
 
-    if (teller_id == NUM_TELLERS - 1) 
-    {
-        sem_post(&bank_open); // Last teller signals that the bank is open
-    }
+    // if (teller_id == NUM_TELLERS - 1) 
+    // {
+    //     sem_post(&bank_open); // Last teller signals that the bank is open
+    // }
     
     while (1) 
     {
-        pthread_mutex_lock(&queue_mutex);
+        log_teller(tid, "waiting for a customer");
+        sem_wait(&customers_ready);
+        // pthread_mutex_lock(&queue_mutex);
+        
+        //cont.
         if (customers_served >= NUM_CUSTOMERS) 
         {
             pthread_mutex_unlock(&queue_mutex);

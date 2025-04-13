@@ -56,5 +56,11 @@ continued coding. fix logic and make manager shared resource, fix queues
 
 NOTE: tested on cslinux1.utdallas.edu servers
 
+## 04.12.2025 22:12 CodingSession::BEGIN
+
+updated code, udpated logger function and split it. 
+fixed semaphores and line logic
+
+## 04.12.2025 01:47 CodingSession::END
 
 
