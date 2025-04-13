@@ -61,6 +61,11 @@ NOTE: tested on cslinux1.utdallas.edu servers
 updated code, udpated logger function and split it. 
 fixed semaphores and line logic
 
-## 04.12.2025 01:47 CodingSession::END
+## 04.13.2025 01:47 CodingSession::END
 
+## 04.13.2025 12:42 CodingSession::BEGIN
+
+updated code, cutomer and teller and main. Add log to file? 
+
+## 04.13.2025 16:58 CodingSession::END
 
