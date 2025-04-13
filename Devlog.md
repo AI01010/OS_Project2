@@ -78,3 +78,9 @@ update arrays use to store information
 
 ## 04.13.2025 18:19 CodingSession::END
 
+
+## 04.13.2025 18:52 CodingSession::BEGIN
+
+updated semaphores for sync
+
+## 04.13.2025 18:56 CodingSession::END

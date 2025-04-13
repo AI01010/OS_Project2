@@ -12,41 +12,32 @@
 #include <unistd.h>
 #include <time.h>
 
-// Constants
 #define NUM_TELLERS 3
-#define NUM_CUSTOMERS 5 //50
-#define MAX_CUSTOMERS_INSIDE 2
+#define NUM_CUSTOMERS 50
+#define MAX_DOOR_ENTRY 2
 #define MAX_SAFE_OCCUPANCY 2
 
-
-// Shared resources
-sem_t door_sem;     // Semaphore for the door (max 2 customers)
-sem_t safe_sem;    // Semaphore for the safe (max 2 tellers)    
-sem_t manager_sem;  // Semaphore for manager interaction (max 1 teller)
-sem_t customers_ready;  // Semaphore for customers ready to be served
-sem_t customer_done[NUM_CUSTOMERS]; // Semaphores for each customer
+// Semaphores
+sem_t door_sem;
+sem_t safe_sem;
+sem_t manager_sem;
+sem_t customers_ready;
+sem_t customer_done[NUM_CUSTOMERS];
 sem_t transaction_asked[NUM_CUSTOMERS];  // Synchronization for asking transaction
 
+// Mutexes
+pthread_mutex_t print_mutex = PTHREAD_MUTEX_INITIALIZER;
+pthread_mutex_t line_mutex = PTHREAD_MUTEX_INITIALIZER;
+pthread_mutex_t served_mutex = PTHREAD_MUTEX_INITIALIZER;
 
-// mutexes for synchronization
-pthread_mutex_t print_mutex = PTHREAD_MUTEX_INITIALIZER; // printing
-pthread_mutex_t line_mutex = PTHREAD_MUTEX_INITIALIZER; // line access
-pthread_mutex_t served_mutex = PTHREAD_MUTEX_INITIALIZER; // served customers
-// int customers_served = 0;
-
-// // Teller and customer states
-// int tellerAvailable[NUM_TELLERS] = {1, 1, 1}; // Track teller availability
-// int customersRemaining = NUM_CUSTOMERS;      // Track remaining customers
-
-// shared data
+// Shared data
 int line[NUM_CUSTOMERS];
-int front = 0;
-int rear = 0;
+int front = 0, rear = 0;
 int customers_served = 0;
 int transaction_type[NUM_CUSTOMERS];  // 0 = deposit, 1 = withdrawal
-int teller_assigned[NUM_CUSTOMERS];  // Tracks teller for each customer
+int teller_assigned[NUM_CUSTOMERS];  // Tracks assigned teller for each customer
 
-// functions to log messages
+// Logging functions
 void log_action(const char *actor_type, int actor_id, const char *related_type, int related_id, const char *msg) 
 {
     pthread_mutex_lock(&print_mutex);
@@ -82,33 +73,33 @@ void log_customer_with_teller(int cid, int tid, const char *msg)
 }
 
 
-// Customer thread function
+// Customer thread
 void *customer(void *arg) 
 {
     int cid = *((int *)arg);
-    transaction_type[cid] = rand() % 2; // random transaction type (0 = deposit, 1 = withdrawal)
+    transaction_type[cid] = rand() % 2;
 
     // Log the transaction type the customer wants
     if (transaction_type[cid] == 0)
-    {
+    {    
         log_customer(cid, "wants to perform a deposit transaction");
     }
     else
-    {
+    {    
         log_customer(cid, "wants to perform a withdrawal transaction");
     }
-    usleep(rand() % 101 * 1000); // Random arrival time (0-100ms)
+    usleep(rand() % 101 * 1000); // Random arrival time
 
     log_customer(cid, "going to bank");
     sem_wait(&door_sem);
 
-    //line access
+    // customer entering the bank
     pthread_mutex_lock(&line_mutex);
     line[rear] = cid;
     rear = (rear + 1) % NUM_CUSTOMERS;
     pthread_mutex_unlock(&line_mutex);
 
-    // Log customer entering the bank and getting in line
+    // log customer actions
     log_customer(cid, "entering bank");
     log_customer(cid, "getting in line");
     log_customer(cid, "selecting a teller");
@@ -116,12 +107,13 @@ void *customer(void *arg)
     // Wait for teller to assign transaction
     sem_post(&customers_ready);
 
-    // Wait for the teller to ask for transaction
-    sem_wait(&transaction_asked[cid]);
-
+    // Wait for teller to ask for transaction
     int tid = teller_assigned[cid];  // Retrieve assigned teller
     log_customer_with_teller(cid, tid, "selects teller");
     log_customer_with_teller(cid, tid, "introduces itself");
+
+    // Wait for the teller to ask for transaction
+    sem_wait(&transaction_asked[cid]);
 
     // Log the customer asking for transaction
     if (transaction_type[cid] == 0)
@@ -132,8 +124,8 @@ void *customer(void *arg)
     {
         log_customer_with_teller(cid, tid, "asks for withdrawal transaction");
     }
-    
-    // Wait for teller to finish transaction
+
+    // Wait for teller to finish the transaction
     sem_wait(&customer_done[cid]);
     log_customer(cid, "leaves the bank");
     sem_post(&door_sem);
@@ -141,23 +133,17 @@ void *customer(void *arg)
     return NULL;
 }
 
-// Teller thread function
+// Teller thread
 void *teller(void *arg) 
 {
     int tid = *((int *)arg);
     log_teller(tid, "ready to serve");
-    // logMessage("Teller", teller_id, "is ready to serve customers");
 
-    // if (teller_id == NUM_TELLERS - 1) 
-    // {
-    //     sem_post(&bank_open); // Last teller signals that the bank is open
-    // }
-    
     while (1) 
     {
         log_teller(tid, "waiting for a customer");
         sem_wait(&customers_ready);
-        
+
         pthread_mutex_lock(&line_mutex);
         if (front == rear) 
         {
@@ -167,16 +153,20 @@ void *teller(void *arg)
         int cid = line[front];
         front = (front + 1) % NUM_CUSTOMERS;
 
-        teller_assigned[cid] = tid;  // Assign current teller to the customer
+        // teller actions
+        teller_assigned[cid] = tid;  // Assign the current teller to the customer
+        usleep(5000);
         log_teller_with_customer(tid, cid, "serving a customer");
-        log_teller_with_customer(tid, cid, "asks for transaction");
-
         pthread_mutex_unlock(&line_mutex);
 
-        // Let customer to proceed with the transaction
+        // Let the customer proceed with the transaction
         sem_post(&transaction_asked[cid]); 
+        log_teller_with_customer(tid, cid, "asks for transaction");
+        
+        // wait to hear from the customer
+        usleep(1000);
 
-        // Log transaction type
+        // Log the correct transaction type
         if (transaction_type[cid] == 0) 
         {
             log_teller_with_customer(tid, cid, "handling deposit transaction");
@@ -188,17 +178,17 @@ void *teller(void *arg)
 
         usleep((rand() % 26 + 5) * 1000); // Simulate 5-30ms work
 
-        if (transaction_type[cid] == 1) // widthdrawal 
+        if (transaction_type[cid] == 1) /// withdrawal
         {
             log_teller_with_customer(tid, cid, "going to the manager");
             log_teller_with_customer(tid, cid, "getting manager's permission");
             sem_wait(&manager_sem);
-            usleep((rand() % 26 + 5) * 1000); // Simulate 5-30ms work
+            usleep((rand() % 26 + 5) * 1000);
             log_teller_with_customer(tid, cid, "got manager's permission");
             sem_post(&manager_sem);
         }
 
-        // teller goes to the safe
+        // Teller goes to the safe
         log_teller_with_customer(tid, cid, "going to safe");
         sem_wait(&safe_sem);
         log_teller_with_customer(tid, cid, "enter safe");
@@ -218,6 +208,7 @@ void *teller(void *arg)
 
         sem_post(&customer_done[cid]);
 
+        // customer leaving
         pthread_mutex_lock(&served_mutex);
         if (customers_served >= NUM_CUSTOMERS) 
         {
@@ -229,8 +220,6 @@ void *teller(void *arg)
     }
 
     log_teller(tid, "leaving for the day");
-    // logMessage("Teller", tellerId, "is leaving for the day");
-    // pthread_exit(NULL);
     return NULL;
 }
 
@@ -238,18 +227,18 @@ int main()
 {
     srand(time(NULL)); // Seed for random number generation
 
-    sem_init(&door_sem, 0, MAX_DOOR_ENTRY); // Semaphore for door (max 2 customers)
-    sem_init(&safe_sem, 0, MAX_SAFE_OCCUPANCY); // Semaphore for safe (max 2 tellers)
-    sem_init(&manager_sem, 0, 1);           // Semaphore for manager (max 1 teller)
-    sem_init(&customers_ready, 0, 0);   // Semaphore for customers ready to be served
+    sem_init(&door_sem, 0, MAX_DOOR_ENTRY); // Semaphore for door entry
+    sem_init(&safe_sem, 0, MAX_SAFE_OCCUPANCY); // Semaphore for safe occupancy
+    sem_init(&manager_sem, 0, 1);           // Semaphore for manager access
+    sem_init(&customers_ready, 0, 0);   // Semaphore for customer readiness
 
-    for (int i = 0; i < NUM_CUSTOMERS; i++) // Initialize customer semaphores
+    for (int i = 0; i < NUM_CUSTOMERS; i++) /// Initialize semaphores for each customer and transaction interaction
     {
         sem_init(&customer_done[i], 0, 0);
         sem_init(&transaction_asked[i], 0, 0);
     }
 
-    // tellers and customers thread and id lists
+    // store teller and customer threads and ids
     pthread_t tellers[NUM_TELLERS];
     pthread_t customers[NUM_CUSTOMERS];
     int teller_ids[NUM_TELLERS];
@@ -293,13 +282,12 @@ int main()
     sem_destroy(&safe_sem);
     sem_destroy(&manager_sem);
     sem_destroy(&customers_ready);
-    for (int i = 0; i < NUM_CUSTOMERS; i++) // destroy customer semaphores and transaction semaphores
+    for (int i = 0; i < NUM_CUSTOMERS; i++) // Destroy customer semaphores
     {
         sem_destroy(&customer_done[i]);
         sem_destroy(&transaction_asked[i]);
     }
 
-    printf("Bank has closed.\n");
-    // logMessage("Bank", 0, "is closed for the day");
+    printf("Bank is now closed.\n");
     return 0;
 }
