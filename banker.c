@@ -37,6 +37,9 @@ int customers_served = 0;
 int transaction_type[NUM_CUSTOMERS];  // 0 = deposit, 1 = withdrawal
 int teller_assigned[NUM_CUSTOMERS];  // Tracks assigned teller for each customer
 
+// Open the log file
+FILE *log_file;
+
 // Logging functions
 void log_action(const char *actor_type, int actor_id, const char *related_type, int related_id, const char *msg) 
 {
@@ -44,10 +47,20 @@ void log_action(const char *actor_type, int actor_id, const char *related_type, 
     if (related_type == NULL) 
     {
         printf("%s %d []: %s\n", actor_type, actor_id, msg);
+        if (log_file != NULL) 
+        {
+            fprintf(log_file, "%s %d []: %s\n", actor_type, actor_id, msg);
+            fflush(log_file); // Ensure the message is written immediately
+        }
     } 
     else 
     {
         printf("%s %d [%s %d]: %s\n", actor_type, actor_id, related_type, related_id, msg);
+        if (log_file != NULL) 
+        {
+            fprintf(log_file, "%s %d [%s %d]: %s\n", actor_type, actor_id, related_type, related_id, msg);
+            fflush(log_file);
+        }
     }
     pthread_mutex_unlock(&print_mutex);
 }
@@ -227,6 +240,14 @@ int main()
 {
     srand(time(NULL)); // Seed for random number generation
 
+    // Open the log file
+    log_file = fopen("logfile.txt", "w");
+    if (log_file == NULL) 
+    {
+        perror("Error opening logfile.txt");
+        return 1;
+    }
+    
     sem_init(&door_sem, 0, MAX_DOOR_ENTRY); // Semaphore for door entry
     sem_init(&safe_sem, 0, MAX_SAFE_OCCUPANCY); // Semaphore for safe occupancy
     sem_init(&manager_sem, 0, 1);           // Semaphore for manager access
@@ -289,5 +310,10 @@ int main()
     }
 
     printf("Bank is now closed.\n");
+    if(log_file != NULL) 
+    {
+        fprintf(log_file, "Bank is now closed.\n");
+        fclose(log_file); // Close the log file
+    }
     return 0;
 }
