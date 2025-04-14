@@ -84,3 +84,6 @@ update arrays use to store information
 updated semaphores for sync
 
 ## 04.13.2025 18:56 CodingSession::END
+
+NOTE: test on cslinux1.utdallas.edu servers
+
